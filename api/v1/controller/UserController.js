@@ -9,7 +9,7 @@ exports.add_user = (req, res) => {
     if(merchant_qc == ''){
         merchant_qc = 0
     }
-    req.body.p_in_encrypt = password
+    req.body.p_in_encrypt = btoa(password)
     if (Object.keys(req.body).length === 0) {
         return res.status(200).send({
              message: 'merchant information is required',
@@ -60,34 +60,48 @@ exports.add_user = (req, res) => {
                     status: false
                 })
             }else{
-                const create = new MerchantQc({...req.body});
-                create
-                    .save()
-                    .then(results => {
-                        console.log(results);
-                        if (results) {
-                            res.setHeader('Content-Type', 'application/json');
-                           return res.status(200).send({
-                                data: results,
-                                message: 'insert successfully',
-                                insertId: create._id,
-                                status: true,
-                            })
+                if(password != "" && password.length >= 6){
+
+                    bcrypt.hash(password, 10, (err, hash)=> {
+                        if (err){
+                            return   res.status(500).json({
+                                           message : "Something went wrong", 
+                                           error : err,
+                                           status : false
+                                       })
                         }
+                        req.body.password = hash
+                        const create = new MerchantQc({...req.body});
+                        create
+                            .save()
+                            .then(results => {
+                                console.log(results);
+                                if (results) {
+                                    
+                                   return res.status(200).send({
+                                        data: results,
+                                        message: 'insert successfully',
+                                        insertId: create._id,
+                                        status: true,
+                                    })
+                                }
+                            })
+                            .catch(error => {
+                                
+                                return res.status(500).send({
+                                    message: error,
+                                    status: false
+                                })
+                            })
                     })
-                    .catch(error => {
-                        res.setHeader('Content-Type', 'application/json');
-                        return res.status(500).send({
-                            message: error,
-                            status: false
-                        })
-                    })
+
+                }
             }
             
         })
         .catch(error => {
             console.log('erroro massage')
-            res.setHeader('Content-Type', 'application/json');
+            
             
             res.status(500).json({
                 message: error,
@@ -98,3 +112,56 @@ exports.add_user = (req, res) => {
     
 };
 //add User end
+
+
+//Login User Start
+exports.userLogin = async (req , res) => {
+    // console.log(req.body)
+    let {email_id,password} = req.body
+    // return res.status(200).json('ok')
+    await MerchantQc.findOne({email_id : email_id})
+    .exec()
+    .then(user  => {
+        console.log(user)
+        if (!user){
+            console.log(user)
+           return  res.status(401).json({
+                message : "User dosen't exist",
+                status : false
+            });
+        }
+        bcrypt.compare(password, user.password, (err ,result)=>{
+            if (err) {
+                return res.status(203).json({
+                    message : "Incorrect username & password detail",
+                    status : false
+                })
+            }
+            if (result){
+
+                
+                 const token = jwt.sign({email_id : user.email_id,userId:user._id, merchant_qc : user.merchant_qc, userName : user.fullname}, process.env.JWT_KEY,{expiresIn :  "24h"} )
+                
+                return res.status(200).json({
+                    message : "Auth Successfully",
+                    token : token,
+                    name : user.fullname,
+                    status : true
+                })
+            }
+            return res.status(401).json({
+                message : " Auth Failed",
+                status : false
+            })
+        })
+    })
+    .catch(err => {
+        return res.status(500).json({
+            error : err,
+            message  : "Something went wrong",
+            status : 0
+        });
+    })
+}
+
+//Login User End
