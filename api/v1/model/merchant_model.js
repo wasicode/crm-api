@@ -227,6 +227,8 @@ const merchantSchema = new mongoose.Schema({
         type: String,
         trim:true,
     },
+},{
+    timestamps: true,
 })
 
 module.exports = mongoose.model('merchant_qc', merchantSchema);
